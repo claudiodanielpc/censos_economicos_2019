@@ -1,4 +1,6 @@
-#Cuadros valor agregado estatales
+#Cuadros valor bruto de la producción estatales
+#Datos de los Censos Económicos 2019
+
 
 ##Borrar datos del entorno
 rm(list=ls())
