@@ -39,30 +39,30 @@ unlink(temp)
 
 cat<-read.csv("censoseco2019/catálogo/AGEEML_20211271319772.csv",
               encoding ="latin1" )%>%
-    #Remover la última fila
+  #Remover la última fila
   slice(1:(n()-1))%>%
   #Renombrar y seleccionar la variable de interés
   rename(entidad=1,
          nom_ent=2,
-    abrev=3)%>%
+         abrev=3)%>%
   select(entidad,nom_ent,abrev)%>%
   #Quitar punto al final, minúsculas y quitar espacios intermedios
   mutate(abrev=str_remove(abrev,"[.]"))%>%
   mutate(abrev=tolower(abrev))%>%
   mutate(abrev=str_replace_all(abrev," ",""))
-  
+
 
 #Crear listado de abreviaturas
 lista<-cat$abrev
 
 #Descarga de archivos de Censos Económicos 2019====
-  ##Descargar y extrar los datos para las 32 entidades federativas
+##Descargar y extrar los datos para las 32 entidades federativas
 for (i in seq_along(lista)) {  
   ##Descargar
   temp<-tempfile()
   download.file(paste0(url,lista[i],"_csv.zip"),
                 destfile = temp)
-
+  
   ##Extraer
   unzip(temp,
         exdir = "censoseco2019")
@@ -78,13 +78,13 @@ for (i in seq_along(lista)) {
   if (file.exists(paste0("censoseco2019/conjunto_de_datos/bitacora_de_cambios_ce2019_",
                          lista[i],
                          ".csv"))) {
-  file.remove(paste0("censoseco2019/conjunto_de_datos/bitacora_de_cambios_ce2019_",
-                     lista[i],
-                     ".csv"))
+    file.remove(paste0("censoseco2019/conjunto_de_datos/bitacora_de_cambios_ce2019_",
+                       lista[i],
+                       ".csv"))
   }
   
 }
-  
+
 
 #Lectura y limpieza de datos====
 archivosest<-list.files(path = "censoseco2019/conjunto_de_datos", 
@@ -93,43 +93,43 @@ archivosest<-list.files(path = "censoseco2019/conjunto_de_datos",
 
 
 datosce<-purrr::map(archivosest,
-           ~ read_csv(glue::glue("censoseco2019/conjunto_de_datos/{.x}"), 
-                      na = "*") %>% 
-             #Nombres de las variables en minúsculas
-             janitor::clean_names()%>%
-             #Seleccionar variables a usar
-             select(entidad,codigo,
-                    a111a)%>%
-             #Renombrar valor agregado
-             rename(pbt=a111a)%>%
-             #Transformar código de edificación residencial,
-             #manufacturas y transportes aéreos a dos dígitos
-             mutate(codigo=ifelse(codigo==2361,99,
-                                  ifelse(codigo=="31-33",31,
-                                  ifelse(codigo=="48-49",48,
-                                  codigo))))%>%
-             #Filtrar por sector
-             filter(nchar(as.character(codigo)) == 2)%>%
-            #Obtener totales de cada actividad
-             group_by(entidad,codigo)%>%
-             #Se filtra la primera observación
-             slice(c(1))%>%
-             ungroup()%>%
-             ##Se transforma la lista a dataframe
-             as.data.frame.data.frame())
-      
+                    ~ read_csv(glue::glue("censoseco2019/conjunto_de_datos/{.x}"), 
+                               na = "*") %>% 
+                      #Nombres de las variables en minúsculas
+                      janitor::clean_names()%>%
+                      #Seleccionar variables a usar
+                      select(entidad,codigo,
+                             h001a)%>%
+                      #Renombrar personal ocupado
+                      rename(po=h001a)%>%
+                      #Transformar código de edificación residencial,
+                      #manufacturas y transportes aéreos a dos dígitos
+                      mutate(codigo=ifelse(codigo==2361,99,
+                                           ifelse(codigo=="31-33",31,
+                                                  ifelse(codigo=="48-49",48,
+                                                         codigo))))%>%
+                      #Filtrar por sector
+                      filter(nchar(as.character(codigo)) == 2)%>%
+                      #Obtener totales de cada actividad
+                      group_by(entidad,codigo)%>%
+                      #Se filtra la primera observación
+                      slice(c(1))%>%
+                      ungroup()%>%
+                      ##Se transforma la lista a dataframe
+                      as.data.frame.data.frame())
+
 
 ##Datos agrupados
-pbt<-data.table::rbindlist(datosce, fill = TRUE, idcol = F)%>%
-#Transformar la clave de la entidad a numérico y pegarle los nombres
-mutate(entidad=as.numeric(entidad))%>%
+po<-data.table::rbindlist(datosce, fill = TRUE, idcol = F)%>%
+  #Transformar la clave de la entidad a numérico y pegarle los nombres
+  mutate(entidad=as.numeric(entidad))%>%
   left_join(cat)
 
 
 #Códigos de actividad
 codact<-read.csv("censoseco2019/catalogos/tc_codigo_actividad.csv", 
                  encoding = "UTF-8", check.names = T,header = T)%>%
-##Extraer códigos de index
+  ##Extraer códigos de index
   rownames_to_column(.,"codigo")%>%
   #Renombrar
   rename(nombre=2,
@@ -141,39 +141,39 @@ codact<-read.csv("censoseco2019/catalogos/tc_codigo_actividad.csv",
   mutate(desc=ifelse(nombre=="Edificación residencial" & desc=="Rama",
                      "Sector",desc),
          codigo=ifelse(nombre=="Edificación residencial" & desc=="Sector","99",
-         #Manufacturas y transportes a dos dígitos
+                       #Manufacturas y transportes a dos dígitos
                        ifelse(codigo=="31-33","31",
-                ifelse(codigo=="48-49","48",codigo))))%>%
+                              ifelse(codigo=="48-49","48",codigo))))%>%
   #>Filtrar sectores
   filter(desc=="Sector")
 
-  
+
 ##Llamar los datos de Producción bruta
-  pbt<-pbt%>%
-     #Pegar categorías del catálogo de actividades económicas
-    left_join(codact)%>%
-    mutate(pbt = replace_na(pbt, 0))%>%
-    group_by(nom_ent)%>%
-    ##Sumar el valor de la producción sin considerar edificación residencial
-    mutate(total=sum(pbt[codigo!="99"]),
-           #Calcular porcentaje del total
-    pct=pbt/total*100)%>%
-    ungroup()
+po<-po%>%
+  #Pegar categorías del catálogo de actividades económicas
+  left_join(codact)%>%
+  mutate(po = replace_na(po, 0))%>%
+  group_by(nom_ent)%>%
+  ##Sumar el valor de la producción sin considerar edificación residencial
+  mutate(total=sum(po[codigo!="99"]),
+         #Calcular porcentaje del total
+         pct=po/total*100)%>%
+  ungroup()
+
+
+
+
+##Tablas para cada una de las entidades federativas====
+
+#Generar nombres para filtro y números para guardar los archivos
+entidades<-unique(cat$nom_ent)
+num_ent<-unique(cat$entidad)
+
+
+for (i in seq_along(entidades)) {
   
-  
-  
-  
-  ##Tablas para cada una de las entidades federativas====
-  
-  #Generar nombres para filtro y números para guardar los archivos
-  entidades<-unique(cat$nom_ent)
-  num_ent<-unique(cat$entidad)
-  
-  
-  for (i in seq_along(entidades)) {
-  
-    pbt%>%
-  filter(nom_ent==entidades[i])%>%
+  po%>%
+    filter(nom_ent==entidades[i])%>%
     #Ordenar de mayor a menor
     arrange(desc(pct))%>%
     #Variables de interés  
@@ -182,25 +182,25 @@ codact<-read.csv("censoseco2019/catalogos/tc_codigo_actividad.csv",
     mutate(pct=format(round(pct,1)))%>%
     ##Crear tabla
     kable(caption=paste(text_spec(entidades[i],bold=T, 
-                                   color="black",font_size = 30 ),
-                         text_spec(". ",
-                                   bold=T, color="black",font_size = 30),
-                         text_spec("Distribución de las actividades económicas",
-                                   bold=T, color="black",font_size = 30),
-                         sep="\n"),
+                                  color="black",font_size = 30 ),
+                        text_spec(". ",
+                                  bold=T, color="black",font_size = 30),
+                        text_spec("Distribución del personal ocupado total por actividad económica",
+                                  bold=T, color="black",font_size = 30),
+                        sep="\n"),
           format="html",
           align = "c",
           col.names = c("Sector",
-                        "Porcentaje de la producción bruta"))%>%
-    kable_styling(full_width = F, font_size = 20,
+                        "Porcentaje del personal ocupado"))%>%
+    kable_styling(full_width = F, font_size = 20, 
                   html_font = "Century Gothic")%>%
     row_spec(0, bold = F, color = "black", background = "#feb24c")%>%
     footnote(general = "Elaborado por CANADEVI Nacional. Gerencia de Fondos de Vivienda. 
 Coordinación de Indicadores de Vivienda con datos de INEGI. Censos Económicos 2019.\n
 La suma de los porcentajes es mayor a 100 ya que en el presente cuadro se incluye a la edificación residencial\n
-La producción bruta total es el valor de todos los bienes y servicios producidos o comercializados por la unidad económica como resultado del ejercicio de sus actividades, comprendiendo el valor de los productos elaborados; el margen bruto de comercialización; las obras ejecutadas; los ingresos por la prestación de servicios, así como el alquiler de maquinaria y equipo, y otros bienes muebles e inmuebles; el valor de los activos fijos producidos para uso propio, entre otros. Incluye la variación de existencias de productos en proceso. Los bienes y servicios se valoran a precios productor.",
+Personal ocupado total: Comprende a todas las personas que trabajaron durante el periodo de referencia dependiendo contractualmente o no de la unidad económica, sujetas a su dirección y control.",
              general_title = "
 Fuente: ",
              threeparttable=T)%>%
-    as_image(file=paste0("censoseco2019/vbp",num_ent[i],".png"))
-  }
+    as_image(file=paste0("censoseco2019/po",num_ent[i],".png"))
+}
