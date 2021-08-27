@@ -53,7 +53,7 @@ cat<-read.csv("censoseco2019/catálogo/AGEEML_20211271319772.csv",
   
 
 #Crear listado de abreviaturas
-lista<-cat$abrev
+lista<-unique(cat$abrev)
 
 #Descarga de archivos de Censos Económicos 2019====
   ##Descargar y extrar los datos para las 32 entidades federativas
