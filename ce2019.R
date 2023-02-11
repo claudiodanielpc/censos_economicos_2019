@@ -37,14 +37,14 @@ unlink(temp)
 
 #Leer archivo de catálogo y arreglar
 
-cat<-read.csv("censoseco2019/catálogo/AGEEML_20211271319772.csv",
+cat<-read.csv("censoseco2019/catálogo/AGEEML_20231161410585.csv",
               encoding ="latin1" )%>%
     #Remover la última fila
   slice(1:(n()-1))%>%
   #Renombrar y seleccionar la variable de interés
-  rename(entidad=1,
-         nom_ent=2,
-    abrev=3)%>%
+  rename(entidad=2,
+         nom_ent=3,
+    abrev=4)%>%
   select(entidad,nom_ent,abrev)%>%
   #Quitar punto al final, minúsculas y quitar espacios intermedios
   mutate(abrev=str_remove(abrev,"[.]"))%>%
