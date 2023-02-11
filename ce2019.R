@@ -39,8 +39,7 @@ unlink(temp)
 
 cat<-read.csv("censoseco2019/catálogo/AGEEML_20231161410585.csv",
               encoding ="latin1" )%>%
-    #Remover la última fila
-  slice(1:(n()-1))%>%
+    
   #Renombrar y seleccionar la variable de interés
   rename(entidad=2,
          nom_ent=3,
